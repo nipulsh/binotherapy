@@ -2,13 +2,31 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
+import Head from "next/head";
 import { RoundCompleteModal } from "@/components/game/round-complete-modal";
 import { useRoundComplete } from "@/hooks/useRoundComplete";
 
 // Game constants
-const GAME_WIDTH = 800;
-const GAME_HEIGHT = 600;
 const GAME_DURATION = 30; // 30 seconds game duration
+
+// Calculate responsive game dimensions
+const getGameDimensions = () => {
+  if (typeof window === "undefined") {
+    return { width: 800, height: 600 };
+  }
+
+  const isMobile = window.innerWidth < 768;
+  
+  if (isMobile) {
+    // Mobile: Use 90% of viewport width and 80% of viewport height
+    const width = Math.min(window.innerWidth * 0.9, 800);
+    const height = Math.min(window.innerHeight * 0.8, 600);
+    return { width, height };
+  }
+  
+  // Desktop: Use fixed dimensions
+  return { width: 800, height: 600 };
+};
 
 // Physics constants for fruit trajectory
 // We want fruits to reach at least 50% screen height and stay visible 0.8-1.2s
@@ -121,10 +139,13 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
       this.totalFruits = 0;
       this.sliceTrail = [];
 
+      // Get actual canvas dimensions
+      const { width, height } = this.scale;
+
       // Dark theme background
       const graphics = this.add.graphics();
       graphics.fillGradientStyle(0x0f0f1e, 0x0f0f1e, 0x1a1a2e, 0x1a1a2e, 1);
-      graphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      graphics.fillRect(0, 0, width, height);
       graphics.setDepth(-1);
 
       this.fruits = this.physics.add.group();
@@ -140,7 +161,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
       this.input.on("pointerup", this.onSliceEnd, this);
 
       this.comboText = this.add
-        .text(GAME_WIDTH / 2, 100, "", {
+        .text(width / 2, 100, "", {
           fontSize: "56px",
           fontFamily: "Arial Black",
           color: "#ffff00",
@@ -318,8 +339,10 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
 
       const isBomb = Math.random() < config.bombChance;
 
-      const startX = Phaser.Math.Between(100, GAME_WIDTH - 100);
-      const startY = GAME_HEIGHT + 50;
+      // Get actual canvas dimensions
+      const { width, height } = this.scale;
+      const startX = Phaser.Math.Between(100, width - 100);
+      const startY = height + 50;
 
       // Physics-based trajectory calculation
       // Target airtime between 0.8-1.2 seconds
@@ -338,10 +361,10 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
         item = this.bombs.create(startX, startY, "bomb");
         item.setData("isBomb", true);
 
-        // Bomb pulsing animation
+        // Bomb pulsing animation (reduced to match collision area)
         this.tweens.add({
           targets: item,
-          scale: { from: 0.8, to: 0.95 },
+          scale: { from: 0.4, to: 0.48 },
           duration: 300,
           yoyo: true,
           repeat: -1,
@@ -367,7 +390,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
       item.setVelocity(horizontalSpeed, initialVelocityY);
       item.setAngularVelocity(Phaser.Math.Between(-200, 200));
       item.setGravityY(GRAVITY);
-      item.setScale(0.8);
+      item.setScale(0.4); // Reduced to match collision area (40px radius)
       item.setInteractive();
 
       // Spawn animation
@@ -375,7 +398,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
       this.tweens.add({
         targets: item,
         alpha: 1,
-        scale: 0.9,
+        scale: 0.45, // Reduced to match collision area
         duration: 150,
         ease: "Back.easeOut",
       });
@@ -468,7 +491,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
           if (
             f.active &&
             Phaser.Geom.Circle.Contains(
-              new Phaser.Geom.Circle(f.x, f.y, 40),
+              new Phaser.Geom.Circle(f.x, f.y, 25), // Reduced to match smaller fruit size
               pointer.x,
               pointer.y
             )
@@ -485,7 +508,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
           if (
             b.active &&
             Phaser.Geom.Circle.Contains(
-              new Phaser.Geom.Circle(b.x, b.y, 40),
+              new Phaser.Geom.Circle(b.x, b.y, 25), // Reduced to match smaller bomb size
               pointer.x,
               pointer.y
             )
@@ -587,7 +610,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
       const texture = (item as any).texture.key;
       for (let i = 0; i < 2; i++) {
         const half = this.add.image(x, y, texture);
-        half.setScale(0.9);
+        half.setScale(0.45); // Match the new smaller fruit size
         half.setTint(i === 0 ? 0xffffff : 0xdddddd);
 
         const velocityX = (i === 0 ? -1 : 1) * Phaser.Math.Between(150, 250);
@@ -618,7 +641,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
           y: y + velocityY + 300,
           angle: rotationSpeed,
           alpha: 0,
-          scale: 0.4,
+          scale: 0.2, // End at smaller size
           duration: 1000,
           ease: "Cubic.easeIn",
           onComplete: () => {
@@ -728,13 +751,15 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
 
       // Combo milestone effects
       if (this.combo % 5 === 0) {
-        this.sparkEmitter.explode(15, GAME_WIDTH / 2, 100);
+        const { width } = this.scale;
+        this.sparkEmitter.explode(15, width / 2, 100);
       }
     }
 
     showSpecialComboEffect() {
+      const { width, height } = this.scale;
       const text = this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "🔥 MEGA COMBO! 🔥", {
+        .text(width / 2, height / 2, "🔥 MEGA COMBO! 🔥", {
           fontSize: "64px",
           fontFamily: "Arial Black",
           color: "#ff00ff",
@@ -769,11 +794,12 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
       this.cameras.main.flash(300, 255, 0, 0);
 
       // Screen red tint
+      const { width, height } = this.scale;
       const redOverlay = this.add.rectangle(
-        GAME_WIDTH / 2,
-        GAME_HEIGHT / 2,
-        GAME_WIDTH,
-        GAME_HEIGHT,
+        width / 2,
+        height / 2,
+        width,
+        height,
         0xff0000,
         0.3
       );
@@ -822,8 +848,9 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
 
       // Warning when time is low
       if (this.timeLeft === 10) {
+        const { width, height } = this.scale;
         const warningText = this.add
-          .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "⏰ 10 SECONDS LEFT! ⏰", {
+          .text(width / 2, height / 2, "⏰ 10 SECONDS LEFT! ⏰", {
             fontSize: "48px",
             fontFamily: "Arial Black",
             color: "#ff0000",
@@ -930,11 +957,13 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
     }
 
     update() {
+      const { height } = this.scale;
+      
       this.fruits.children.entries.forEach(
         (fruit: Phaser.GameObjects.GameObject) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const f = fruit as any;
-          if (f.y > GAME_HEIGHT + 100) {
+          if (f.y > height + 100) {
             if (!f.getData("missed")) {
               f.setData("missed", true);
               this.lives--;
@@ -953,7 +982,7 @@ function createFruitNinjaScene(Phaser: typeof import("phaser")) {
         (bomb: Phaser.GameObjects.GameObject) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const b = bomb as any;
-          if (b.y > GAME_HEIGHT + 100) {
+          if (b.y > height + 100) {
             b.destroy();
           }
         }
@@ -968,6 +997,22 @@ export default function FruitNinjaPage() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const phaserReadyRef = useRef(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState("easy");
+  const [gameDimensions, setGameDimensions] = useState(getGameDimensions());
+
+  // Update dimensions on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setGameDimensions(getGameDimensions());
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+    };
+  }, []);
 
   const {
     isOpen: isRoundCompleteOpen,
@@ -1000,11 +1045,12 @@ export default function FruitNinjaPage() {
       }
 
       const FruitNinjaScene = createFruitNinjaScene(window.Phaser);
+      const dimensions = getGameDimensions();
 
       const config = {
         type: window.Phaser.AUTO,
-        width: GAME_WIDTH,
-        height: GAME_HEIGHT,
+        width: dimensions.width,
+        height: dimensions.height,
         parent: "game",
         backgroundColor: "#87ceeb",
         physics: {
@@ -1018,6 +1064,8 @@ export default function FruitNinjaPage() {
         scale: {
           mode: window.Phaser.Scale.FIT,
           autoCenter: window.Phaser.Scale.CENTER_BOTH,
+          width: dimensions.width,
+          height: dimensions.height,
         },
       };
 
@@ -1144,59 +1192,66 @@ export default function FruitNinjaPage() {
   }, [showRoundComplete]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-gray-900 flex flex-col items-center justify-center p-4">
-      <Script
-        src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"
-        strategy="beforeInteractive"
-      />
+    <>
+      <Head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+      </Head>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-gray-900 flex flex-col items-center justify-center p-2 sm:p-4 touch-none overflow-hidden">
+        <Script
+          src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"
+          strategy="beforeInteractive"
+        />
 
-      <div className="mb-4">
+      <div className="mb-2 sm:mb-4 w-full px-2">
         <Link
           href="/games"
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow-lg transition-all hover:scale-105 border-2 border-purple-400"
+          className="inline-block px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow-lg transition-all hover:scale-105 border-2 border-purple-400"
         >
           ← Back to Games
         </Link>
       </div>
 
-      <h1 className="text-5xl md:text-6xl font-black mb-6 text-center bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.5)]">
+      <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-3 sm:mb-6 text-center bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.5)] px-2">
         🍉 FRUIT NINJA 🔪
       </h1>
 
-      <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-purple-500/30 p-6 mb-6 w-full max-w-4xl">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div className="bg-gradient-to-br from-cyan-600 to-blue-700 rounded-xl p-4 shadow-lg border border-cyan-400/30">
-            <div className="text-sm font-bold text-cyan-200 mb-1">SCORE</div>
+      <div className="bg-gray-900/80 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-2xl border-2 border-purple-500/30 p-3 sm:p-6 mb-3 sm:mb-6 w-full max-w-4xl mx-2">
+        <div className="flex justify-around sm:grid sm:grid-cols-4 gap-2 sm:gap-4 text-center">
+          <div className="bg-gradient-to-br from-cyan-600 to-blue-700 rounded-lg sm:rounded-xl p-2 sm:p-4 shadow-lg border border-cyan-400/30 min-w-0">
+            <div className="text-[10px] sm:text-sm font-bold text-cyan-200 mb-0.5 sm:mb-1">SCORE</div>
             <div
               id="score"
-              className="text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+              className="text-lg sm:text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]"
             >
               0
             </div>
           </div>
-          <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-4 shadow-lg border border-purple-400/30">
-            <div className="text-sm font-bold text-purple-200 mb-1">COMBO</div>
+          <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg sm:rounded-xl p-2 sm:p-4 shadow-lg border border-purple-400/30 min-w-0">
+            <div className="text-[10px] sm:text-sm font-bold text-purple-200 mb-0.5 sm:mb-1">COMBO</div>
             <div
               id="combo"
-              className="text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
+              className="text-lg sm:text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
             >
               0x
             </div>
           </div>
-          <div className="bg-gradient-to-br from-red-600 to-pink-600 rounded-xl p-4 shadow-lg border border-red-400/30">
-            <div className="text-sm font-bold text-red-200 mb-1">LIVES</div>
+          <div className="bg-gradient-to-br from-red-600 to-pink-600 rounded-lg sm:rounded-xl p-2 sm:p-4 shadow-lg border border-red-400/30 min-w-0">
+            <div className="text-[10px] sm:text-sm font-bold text-red-200 mb-0.5 sm:mb-1">LIVES</div>
             <div
               id="lives"
-              className="text-3xl drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]"
+              className="text-lg sm:text-3xl drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]"
             >
               ❤️❤️❤️
             </div>
           </div>
-          <div className="bg-gradient-to-br from-green-600 to-emerald-600 rounded-xl p-4 shadow-lg border border-green-400/30">
-            <div className="text-sm font-bold text-green-200 mb-1">TIME</div>
+          <div className="bg-gradient-to-br from-green-600 to-emerald-600 rounded-lg sm:rounded-xl p-2 sm:p-4 shadow-lg border border-green-400/30 min-w-0">
+            <div className="text-[10px] sm:text-sm font-bold text-green-200 mb-0.5 sm:mb-1">TIME</div>
             <div
               id="timer"
-              className="text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]"
+              className="text-lg sm:text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]"
             >
               30s
             </div>
@@ -1205,60 +1260,72 @@ export default function FruitNinjaPage() {
       </div>
 
       <div
-        className="relative mx-auto"
-        style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
+        className="relative mx-auto w-full flex justify-center px-2"
+        style={{ 
+          maxWidth: gameDimensions.width,
+        }}
       >
         <div
           id="game"
-          className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white/50"
-          style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
+          className="rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/50 touch-none"
+          style={{ 
+            width: gameDimensions.width, 
+            height: gameDimensions.height,
+            maxWidth: '100%',
+          }}
         ></div>
 
         {/* Start Screen */}
         <div
           id="start-screen"
-          className="absolute inset-0 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-gray-900/95 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10 border-2 border-purple-500/50"
-          style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
+          className="absolute inset-0 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-gray-900/95 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl sm:rounded-2xl z-10 border-2 border-purple-500/50 overflow-y-auto"
+          style={{ 
+            width: gameDimensions.width, 
+            height: gameDimensions.height,
+            maxWidth: '100%',
+          }}
         >
-          <div className="text-center space-y-6 p-8">
-            <h2 className="text-5xl font-black bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.8)] animate-pulse">
+          <div className="text-center space-y-3 sm:space-y-6 p-3 sm:p-8 max-h-full overflow-y-auto">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.8)] animate-pulse">
               🔪 SLICE THE FRUITS! 🔪
             </h2>
-            <p className="text-xl text-purple-200 font-bold drop-shadow-md">
-              Swipe to slice fruits! Avoid bombs! 30 seconds!
+            <p className="text-sm sm:text-base md:text-xl text-purple-200 font-bold drop-shadow-md">
+              {typeof window !== 'undefined' && window.innerWidth < 640 
+                ? "Tap to slice fruits! Avoid bombs! 30 seconds!"
+                : "Swipe to slice fruits! Avoid bombs! 30 seconds!"}
             </p>
 
-            <div className="space-y-4">
-              <p className="text-lg font-bold text-cyan-300 drop-shadow-md">
+            <div className="space-y-2 sm:space-y-4">
+              <p className="text-base sm:text-lg font-bold text-cyan-300 drop-shadow-md">
                 ⚔️ SELECT DIFFICULTY:
               </p>
-              <div className="flex gap-3 justify-center flex-wrap">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
                 <button
                   onClick={() => handleDifficultySelect("easy")}
-                  className={`px-6 py-2 rounded-xl font-black text-base transition-all transform hover:scale-110 shadow-lg border-2 ${
+                  className={`px-4 sm:px-6 py-2 rounded-xl font-black text-sm sm:text-base transition-all transform hover:scale-110 shadow-lg border-2 touch-manipulation min-h-[44px] ${
                     selectedDifficulty === "easy"
                       ? "bg-green-500 text-white border-green-300 scale-110 shadow-green-500/50"
-                      : "bg-gray-800/80 text-green-400 border-green-500/50 hover:bg-gray-700"
+                      : "bg-gray-800/80 text-green-400 border-green-500/50 hover:bg-gray-700 active:bg-gray-600"
                   }`}
                 >
                   🍎 EASY (2 Fruits)
                 </button>
                 <button
                   onClick={() => handleDifficultySelect("medium")}
-                  className={`px-6 py-2 rounded-xl font-black text-base transition-all transform hover:scale-110 shadow-lg border-2 ${
+                  className={`px-4 sm:px-6 py-2 rounded-xl font-black text-sm sm:text-base transition-all transform hover:scale-110 shadow-lg border-2 touch-manipulation min-h-[44px] ${
                     selectedDifficulty === "medium"
                       ? "bg-orange-500 text-white border-orange-300 scale-110 shadow-orange-500/50"
-                      : "bg-gray-800/80 text-orange-400 border-orange-500/50 hover:bg-gray-700"
+                      : "bg-gray-800/80 text-orange-400 border-orange-500/50 hover:bg-gray-700 active:bg-gray-600"
                   }`}
                 >
                   🍊 MEDIUM (4 Fruits)
                 </button>
                 <button
                   onClick={() => handleDifficultySelect("hard")}
-                  className={`px-6 py-2 rounded-xl font-black text-base transition-all transform hover:scale-110 shadow-lg border-2 ${
+                  className={`px-4 sm:px-6 py-2 rounded-xl font-black text-sm sm:text-base transition-all transform hover:scale-110 shadow-lg border-2 touch-manipulation min-h-[44px] ${
                     selectedDifficulty === "hard"
                       ? "bg-red-500 text-white border-red-300 scale-110 shadow-red-500/50"
-                      : "bg-gray-800/80 text-red-400 border-red-500/50 hover:bg-gray-700"
+                      : "bg-gray-800/80 text-red-400 border-red-500/50 hover:bg-gray-700 active:bg-gray-600"
                   }`}
                 >
                   💣 HARD (6 Fruits)
@@ -1266,34 +1333,36 @@ export default function FruitNinjaPage() {
               </div>
             </div>
 
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-4 space-y-2 text-left max-w-md mx-auto border border-purple-500/30">
-              <div className="flex items-center gap-3 text-purple-200 text-sm">
-                <span className="text-2xl">🍎</span>
+            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-3 sm:p-4 space-y-1.5 sm:space-y-2 text-left max-w-md mx-auto border border-purple-500/30">
+              <div className="flex items-center gap-2 sm:gap-3 text-purple-200 text-xs sm:text-sm">
+                <span className="text-xl sm:text-2xl">🍎</span>
                 <span className="font-bold">
-                  Click/swipe fruits to slice them
+                  {typeof window !== 'undefined' && window.innerWidth < 640 
+                    ? "Tap fruits to slice them"
+                    : "Click/swipe fruits to slice them"}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-purple-200 text-sm">
-                <span className="text-2xl">⚡</span>
+              <div className="flex items-center gap-2 sm:gap-3 text-purple-200 text-xs sm:text-sm">
+                <span className="text-xl sm:text-2xl">⚡</span>
                 <span className="font-bold">Build combos for bonus points</span>
               </div>
-              <div className="flex items-center gap-3 text-purple-200 text-sm">
-                <span className="text-2xl">💣</span>
+              <div className="flex items-center gap-2 sm:gap-3 text-purple-200 text-xs sm:text-sm">
+                <span className="text-xl sm:text-2xl">💣</span>
                 <span className="font-bold">Avoid slicing bombs!</span>
               </div>
-              <div className="flex items-center gap-3 text-purple-200 text-sm">
-                <span className="text-2xl">❤️</span>
+              <div className="flex items-center gap-2 sm:gap-3 text-purple-200 text-xs sm:text-sm">
+                <span className="text-xl sm:text-2xl">❤️</span>
                 <span className="font-bold">Don&apos;t let fruits fall</span>
               </div>
-              <div className="flex items-center gap-3 text-cyan-300 text-sm">
-                <span className="text-2xl">⏱️</span>
+              <div className="flex items-center gap-2 sm:gap-3 text-cyan-300 text-xs sm:text-sm">
+                <span className="text-xl sm:text-2xl">⏱️</span>
                 <span className="font-bold">Survive for 30 seconds!</span>
               </div>
             </div>
 
             <button
               onClick={handleStartGame}
-              className="px-12 py-4 bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-600 text-white rounded-xl font-black text-2xl shadow-2xl hover:from-pink-500 hover:via-purple-500 hover:to-cyan-500 transition-all transform hover:scale-110 animate-pulse border-2 border-white/30"
+              className="px-8 sm:px-12 py-3 sm:py-4 bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-600 text-white rounded-xl font-black text-lg sm:text-2xl shadow-2xl hover:from-pink-500 hover:via-purple-500 hover:to-cyan-500 active:from-pink-700 active:via-purple-700 active:to-cyan-700 transition-all transform hover:scale-110 animate-pulse border-2 border-white/30 touch-manipulation min-h-[48px]"
             >
               ⚔️ START GAME ⚔️
             </button>
@@ -1313,16 +1382,17 @@ export default function FruitNinjaPage() {
         )}
       </div>
 
-      <div className="mt-6 text-center max-w-2xl bg-gray-900/60 backdrop-blur-sm rounded-xl p-4 border border-purple-500/30">
-        <p className="text-lg font-bold mb-2 bg-gradient-to-r from-pink-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="mt-3 sm:mt-6 text-center max-w-2xl bg-gray-900/60 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-purple-500/30 mx-2">
+        <p className="text-base sm:text-lg font-bold mb-1 sm:mb-2 bg-gradient-to-r from-pink-400 to-cyan-400 bg-clip-text text-transparent">
           💡 Pro Tips:
         </p>
-        <p className="text-sm text-purple-200">
-          Slice multiple fruits in one swipe for massive combos! Critical hits
+        <p className="text-xs sm:text-sm text-purple-200">
+          Slice multiple fruits in one {typeof window !== 'undefined' && window.innerWidth < 640 ? "tap" : "swipe"} for massive combos! Critical hits
           give 3x points! Chain 10+ combos for mega bonuses! Different
           difficulties spawn different numbers of fruits at once!
         </p>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

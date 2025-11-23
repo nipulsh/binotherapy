@@ -64,28 +64,43 @@ const ShadowPursuitGameComponent = ({
   );
 
   return (
-    <div className="container py-8 max-w-7xl mx-auto px-4">
-      <div className="mb-8">
+    <div className="container py-4 md:py-8 max-w-7xl mx-auto px-2 sm:px-4">
+      <div className="mb-4 md:mb-8">
         <h1
-          className="text-4xl md:text-5xl font-bold mb-3 tracking-tight"
+          className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 md:mb-3 tracking-tight"
           style={{ color: "var(--galaxy-primary)" }}
         >
           Shadow Pursuit
         </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl">
+        <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl">
           Run from the shadow. Hide behind obstacles. Survive as long as you
           can.
         </p>
       </div>
 
-      <Tabs defaultValue="game" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="game">Game</TabsTrigger>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          <TabsTrigger value="instructions">How to Play</TabsTrigger>
+      <Tabs defaultValue="game" className="space-y-3 md:space-y-6">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger
+            value="game"
+            className="flex-1 sm:flex-none text-xs sm:text-sm"
+          >
+            Game
+          </TabsTrigger>
+          <TabsTrigger
+            value="leaderboard"
+            className="flex-1 sm:flex-none text-xs sm:text-sm"
+          >
+            Leaderboard
+          </TabsTrigger>
+          <TabsTrigger
+            value="instructions"
+            className="flex-1 sm:flex-none text-xs sm:text-sm"
+          >
+            How to Play
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="game" className="space-y-6">
+        <TabsContent value="game" className="space-y-3 md:space-y-6">
           <ScoreDisplay
             survivalTime={gameStats.survivalTime}
             chaserSpeed={gameStats.chaserSpeed}
@@ -127,20 +142,20 @@ const ShadowPursuitGameComponent = ({
           >
             <CardHeader>
               <CardTitle
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-base sm:text-lg"
                 style={{ color: "var(--galaxy-accent)" }}
               >
-                <Info className="h-5 w-5" />
+                <Info className="h-4 w-4 sm:h-5 sm:w-5" />
                 How to Play Shadow Pursuit
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs sm:text-sm">
                 Learn how to survive the shadow&apos;s pursuit
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 sm:space-y-4 text-xs sm:text-sm">
               <div>
                 <h3 className="font-semibold mb-2">Objective</h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                   You are the Runner. A dark shadow awakens and will follow you
                   everywhere. Hide behind obstacles and survive as long as
                   possible. Each level increases the police speed!
@@ -149,7 +164,7 @@ const ShadowPursuitGameComponent = ({
 
               <div>
                 <h3 className="font-semibold mb-2">Controls</h3>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <ul className="text-muted-foreground space-y-1 list-disc list-inside">
                   <li>
                     <strong>WASD Keys:</strong> Move up, left, down, right
                   </li>
@@ -164,7 +179,7 @@ const ShadowPursuitGameComponent = ({
 
               <div>
                 <h3 className="font-semibold mb-2">Game Mechanics</h3>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <ul className="text-muted-foreground space-y-1 list-disc list-inside">
                   <li>
                     <strong>Level System:</strong> Every 10 seconds, you level
                     up and police gets faster
@@ -186,7 +201,7 @@ const ShadowPursuitGameComponent = ({
 
               <div>
                 <h3 className="font-semibold mb-2">Strategies</h3>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <ul className="text-muted-foreground space-y-1 list-disc list-inside">
                   <li>Hide behind obstacles to break line of sight</li>
                   <li>Keep moving - never stay in one place</li>
                   <li>
@@ -201,7 +216,7 @@ const ShadowPursuitGameComponent = ({
 
               <div>
                 <h3 className="font-semibold mb-2">Game Over</h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                   When the shadow catches you, your survival time and level
                   reached are recorded. Try to beat your best time and reach
                   higher levels!

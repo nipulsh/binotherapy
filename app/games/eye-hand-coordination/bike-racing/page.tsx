@@ -18,13 +18,13 @@ const MAX_SPEED = 200;
 const StreetBikeRacingGameComponent = ({
   onGameEnd,
 }: {
-  onGameEnd: (result: HookGameResult) => void;
+  onGameEnd?: (result: HookGameResult) => void;
 }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
   const [gameStarted, setGameStarted] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
   const [threeLoaded, setThreeLoaded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   // Load high score from localStorage
   const [highScore, setHighScore] = useState(() => {
     if (typeof window !== "undefined") {
@@ -87,6 +87,7 @@ const StreetBikeRacingGameComponent = ({
   // Ref to store spawnTraffic function to avoid circular dependency
   const spawnTrafficRef = useRef<() => void>(() => {});
   const initializeGameRef = useRef<() => void>(() => {});
+  const isTouchingRef = useRef(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const createRoad = useCallback((scene: any) => {
@@ -362,6 +363,16 @@ const StreetBikeRacingGameComponent = ({
     spawnTrafficRef.current = spawnTraffic;
   }, [spawnTraffic]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window === "undefined") return;
+      setIsMobile(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -393,12 +404,12 @@ const StreetBikeRacingGameComponent = ({
           if (obj.geometry) {
             obj.geometry.dispose();
           }
-          if (obj.material) {
-            if (Array.isArray(obj.material)) {
+            if (obj.material) {
+              if (Array.isArray(obj.material)) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               obj.material.forEach((mat: any) => mat.dispose());
-            } else {
-              obj.material.dispose();
+              } else {
+                obj.material.dispose();
             }
           }
         });
@@ -415,37 +426,49 @@ const StreetBikeRacingGameComponent = ({
     if (!ctx) return;
 
     const state = gameStateRef.current;
-    ctx.clearRect(0, 0, 150, 200);
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    const roadPadding = width * 0.15;
+    const roadWidth = width - roadPadding * 2;
 
     // Draw road
     ctx.fillStyle = "#333";
-    ctx.fillRect(25, 0, 100, 200);
+    ctx.fillRect(roadPadding, 0, roadWidth, height);
 
     // Draw lanes
     ctx.strokeStyle = "#FFF";
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
-    ctx.moveTo(58, 0);
-    ctx.lineTo(58, 200);
-    ctx.moveTo(92, 0);
-    ctx.lineTo(92, 200);
+    ctx.moveTo(roadPadding + roadWidth / 3, 0);
+    ctx.lineTo(roadPadding + roadWidth / 3, height);
+    ctx.moveTo(roadPadding + (roadWidth * 2) / 3, 0);
+    ctx.lineTo(roadPadding + (roadWidth * 2) / 3, height);
     ctx.stroke();
     ctx.setLineDash([]);
 
+    const bikeRelativeX =
+      state.bike && state.bike.position
+        ? (state.bike.position.x + ROAD_WIDTH / 2) / ROAD_WIDTH
+        : 0.5;
+    const bikeX = roadPadding + bikeRelativeX * roadWidth;
+    const bikeWidth = roadWidth * 0.12;
+    const bikeHeight = height * 0.09;
+
     // Draw bike (player)
-    const bikeX = 75 + state.bikePosition * 33;
     ctx.fillStyle = "#FF0000";
-    ctx.fillRect(bikeX - 5, 170, 10, 15);
+    ctx.fillRect(bikeX - bikeWidth / 2, height - bikeHeight - 10, bikeWidth, bikeHeight);
 
     // Draw traffic
     ctx.fillStyle = "#00FF00";
     state.traffic.forEach((car) => {
       const relativeZ = car.position.z - state.camera.position.z;
-      if (relativeZ > -40 && relativeZ < 10) {
-        const carLane = Math.round(car.position.x / LANE_WIDTH);
-        const carX = 75 + carLane * 33;
-        const carY = 170 - (relativeZ + 40) * 4;
-        ctx.fillRect(carX - 4, carY, 8, 12);
+      if (relativeZ > -60 && relativeZ < 15) {
+        const carRelativeX = (car.position.x + ROAD_WIDTH / 2) / ROAD_WIDTH;
+        const carX = roadPadding + carRelativeX * roadWidth;
+        const carY = height - (relativeZ + 60) * (height / 90) - 20;
+        ctx.fillRect(carX - bikeWidth / 2.5, carY, bikeWidth / 1.2, bikeHeight / 1.5);
       }
     });
   }, []);
@@ -488,6 +511,7 @@ const StreetBikeRacingGameComponent = ({
 
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
+    const isMobileDevice = window.innerWidth <= 768;
 
     // Camera
     const camera = new window.THREE.PerspectiveCamera(
@@ -502,10 +526,12 @@ const StreetBikeRacingGameComponent = ({
     // Renderer
     const renderer = new window.THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true;
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
     renderer.domElement.style.display = "block";
+    renderer.domElement.style.touchAction = "none";
     container.appendChild(renderer.domElement);
 
     // Handle WebGL context loss
@@ -591,6 +617,46 @@ const StreetBikeRacingGameComponent = ({
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+
+    const updateTargetPositionFromClientX = (clientX: number) => {
+      if (!renderer.domElement) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      if (!rect.width) return;
+      const relativeX = (clientX - rect.left) / rect.width;
+      const normalized = (relativeX - 0.5) * 2;
+      state.targetBikePosition = Math.max(-1, Math.min(1, normalized * 1.05));
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (!isMobileDevice) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      isTouchingRef.current = true;
+      event.preventDefault();
+      updateTargetPositionFromClientX(touch.clientX);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!isMobileDevice || !isTouchingRef.current) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      event.preventDefault();
+      updateTargetPositionFromClientX(touch.clientX);
+    };
+
+    const handleTouchEnd = () => {
+      if (!isMobileDevice) return;
+      isTouchingRef.current = false;
+    };
+
+    renderer.domElement.addEventListener("touchstart", handleTouchStart, {
+      passive: false,
+    });
+    renderer.domElement.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
+    renderer.domElement.addEventListener("touchend", handleTouchEnd);
+    renderer.domElement.addEventListener("touchcancel", handleTouchEnd);
 
     // Handle window resize
     const handleResize = () => {
@@ -712,25 +778,10 @@ const StreetBikeRacingGameComponent = ({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("resize", handleResize);
-
-      // Update game over screen
-      const finalScoreEl = gameRef.current?.querySelector("#finalScore");
-      const finalDistanceEl = gameRef.current?.querySelector("#finalDistance");
-      const maxSpeedEl = gameRef.current?.querySelector("#maxSpeed");
-      const highScoreEl = gameRef.current?.querySelector("#highScoreDisplay");
-
-      if (finalScoreEl) finalScoreEl.textContent = result.score.toString();
-      if (finalDistanceEl)
-        finalDistanceEl.textContent = Math.floor(state.distance).toString();
-      if (maxSpeedEl)
-        maxSpeedEl.textContent = Math.floor(state.maxSpeed).toString();
-      if (highScoreEl)
-        highScoreEl.textContent = Math.max(
-          highScore,
-          Math.floor(state.score)
-        ).toString();
-
-      setGameOver(true);
+      renderer.domElement.removeEventListener("touchstart", handleTouchStart);
+      renderer.domElement.removeEventListener("touchmove", handleTouchMove);
+      renderer.domElement.removeEventListener("touchend", handleTouchEnd);
+      renderer.domElement.removeEventListener("touchcancel", handleTouchEnd);
 
       // Use global handleGameEnd if available
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -769,39 +820,12 @@ const StreetBikeRacingGameComponent = ({
   const startGameInternal = useCallback(() => {
     if (!gameRef.current || !window.THREE) return;
     setGameStarted(true);
-    setGameOver(false);
     initializeGame();
   }, [initializeGame]);
 
-  const resetGame = useCallback(() => {
-    const state = gameStateRef.current;
-    state.gameActive = false;
-
-    if (state.animationId) {
-      cancelAnimationFrame(state.animationId);
-    }
-    if (state.trafficSpawnTimeout) {
-      clearTimeout(state.trafficSpawnTimeout);
-    }
-
-    // Clear traffic
-    if (state.scene) {
-      state.traffic.forEach((car) => state.scene.remove(car));
-    }
-    state.traffic = [];
-
-    // Reset bike position
-    if (state.bike) {
-      state.bike.position.set(0, 0, 0);
-      state.bike.rotation.z = 0;
-    }
-    if (state.camera) {
-      state.camera.position.set(0, 3, 5);
-    }
-
-    setGameOver(false);
-    setGameStarted(false);
-  }, []);
+  const minimapDimensions = isMobile
+    ? { width: 110, height: 150 }
+    : { width: 150, height: 200 };
 
   return (
     <>
@@ -813,17 +837,22 @@ const StreetBikeRacingGameComponent = ({
       />
       <div
         ref={gameRef}
-        className="w-full h-screen flex flex-col bg-black overflow-hidden relative"
+        className="w-full min-h-screen flex flex-col bg-black overflow-hidden relative"
+        style={{ touchAction: isMobile ? "none" : "auto" }}
       >
         {/* HUD */}
-        <div className="hud absolute top-5 left-1/2 transform -translate-x-1/2 z-50 flex gap-10 bg-black/70 px-10 py-5 rounded-2xl border-4 border-yellow-400 shadow-lg shadow-yellow-400/50">
+        <div
+          className={`hud absolute left-1/2 transform -translate-x-1/2 z-50 flex bg-black/70 rounded-2xl border-4 border-yellow-400 shadow-lg shadow-yellow-400/50 ${
+            isMobile ? "top-2 flex-col gap-3 px-4 py-3 w-[92%]" : "top-5 flex-row gap-10 px-10 py-5"
+          }`}
+        >
           <div className="text-center">
             <span className="block text-yellow-400 text-sm mb-1 uppercase tracking-wider">
               Score:
             </span>
             <span
               id="score"
-              className="inline-block text-white text-3xl font-bold text-shadow min-w-[80px]"
+            className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
             >
               0
             </span>
@@ -834,7 +863,7 @@ const StreetBikeRacingGameComponent = ({
             </span>
             <span
               id="speed"
-              className="inline-block text-white text-3xl font-bold text-shadow min-w-[80px]"
+            className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
             >
               60
             </span>
@@ -846,7 +875,7 @@ const StreetBikeRacingGameComponent = ({
             </span>
             <span
               id="distance"
-              className="inline-block text-white text-3xl font-bold text-shadow min-w-[80px]"
+            className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
             >
               0
             </span>
@@ -858,16 +887,28 @@ const StreetBikeRacingGameComponent = ({
         <div
           id="game-canvas"
           className="flex-1 relative min-h-0 w-full"
-          style={{ height: "100%" }}
+          style={{
+            height: isMobile ? "65vh" : "100%",
+            minHeight: isMobile ? "360px" : "100%",
+            maxHeight: isMobile ? "720px" : "none",
+          }}
         />
 
         {/* Minimap */}
-        <div className="minimap absolute bottom-5 right-5 bg-black/80 p-2.5 rounded-lg border-2 border-yellow-400 z-50">
+        <div
+          className={`minimap absolute z-50 bg-black/80 rounded-lg border-2 border-yellow-400 ${
+            isMobile ? "top-3 right-3 p-1.5" : "bottom-5 right-5 p-2.5"
+          }`}
+        >
           <canvas
             ref={minimapCanvasRef}
-            width={150}
-            height={200}
+            width={minimapDimensions.width}
+            height={minimapDimensions.height}
             className="block rounded"
+            style={{
+              width: minimapDimensions.width,
+              height: minimapDimensions.height,
+            }}
           />
         </div>
 
@@ -884,10 +925,14 @@ const StreetBikeRacingGameComponent = ({
               <div className="controls-info bg-black/50 p-5 rounded-xl my-8">
                 <h3 className="text-yellow-400 text-xl mb-4">Controls:</h3>
                 <p className="text-white text-lg my-2">
-                  ← → Arrow Keys or A/D - Steer Left/Right
+                  {isMobile
+                    ? "Drag your finger anywhere on the road to steer smoothly."
+                    : "← → Arrow Keys or A/D - Steer Left/Right"}
                 </p>
                 <p className="text-white text-lg my-2">
-                  Speed increases as you go!
+                  {isMobile
+                    ? "Keep your finger on the screen for precise control."
+                    : "Speed increases as you go!"}
                 </p>
               </div>
               <Button
@@ -900,56 +945,6 @@ const StreetBikeRacingGameComponent = ({
           </div>
         )}
 
-        {/* Game Over Screen */}
-        {gameOver && (
-          <div className="overlay-screen absolute inset-0 bg-black/95 flex justify-center items-center z-[1000] animate-fadeIn">
-            <div className="screen-content text-center p-10 bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl border-4 border-yellow-400 shadow-2xl shadow-yellow-400/50 max-w-[600px]">
-              <h1 className="game-over-title text-5xl text-red-500 mb-8 animate-shake drop-shadow-lg">
-                💥 CRASH! 💥
-              </h1>
-              <div className="stats bg-black/50 p-6 rounded-xl my-5">
-                <p className="stat-line text-white text-xl my-3">
-                  Final Score:{" "}
-                  <span id="finalScore" className="text-yellow-400 font-bold">
-                    0
-                  </span>
-                </p>
-                <p className="stat-line text-white text-xl my-3">
-                  Distance:{" "}
-                  <span
-                    id="finalDistance"
-                    className="text-yellow-400 font-bold"
-                  >
-                    0
-                  </span>
-                  m
-                </p>
-                <p className="stat-line text-white text-xl my-3">
-                  Max Speed:{" "}
-                  <span id="maxSpeed" className="text-yellow-400 font-bold">
-                    0
-                  </span>{" "}
-                  km/h
-                </p>
-                <p className="stat-line text-white text-xl my-3">
-                  High Score:{" "}
-                  <span
-                    id="highScoreDisplay"
-                    className="text-yellow-400 font-bold"
-                  >
-                    {highScore}
-                  </span>
-                </p>
-              </div>
-              <Button
-                onClick={resetGame}
-                className="btn-large px-12 py-4 text-2xl font-bold text-black bg-gradient-to-r from-yellow-400 to-orange-500 border-none rounded-full cursor-pointer shadow-lg shadow-yellow-400/50 transition-all hover:transform hover:-translate-y-1 hover:shadow-xl hover:shadow-yellow-400/70 uppercase tracking-wider mt-5"
-              >
-                RACE AGAIN
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
       <style jsx>{`
@@ -1008,15 +1003,7 @@ export default function StreetBikeRacingPage() {
       gameType={"eye-hand-coordination" as GameType}
       gameName="bike-racing"
     >
-      <StreetBikeRacingGameComponent
-        onGameEnd={(result) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((window as any).handleGameEnd) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (window as any).handleGameEnd(result);
-          }
-        }}
-      />
+      <StreetBikeRacingGameComponent />
     </GameWrapper>
   );
 }

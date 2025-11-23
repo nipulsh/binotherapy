@@ -103,7 +103,7 @@ const DepthMatchingGameComponent = ({
       const height = container.clientHeight || 600;
 
       // Responsive camera settings
-      const fov = isMobile ? 85 : 75; // Wider FOV for mobile
+      const fov = isMobile ? 90 : 75; // Wider FOV for mobile
       state.camera = new THREE.PerspectiveCamera(
         fov,
         width / height,
@@ -113,7 +113,7 @@ const DepthMatchingGameComponent = ({
 
       // Adjust camera position for mobile
       if (isMobile) {
-        state.camera.position.set(0, 3, 18); // Further back for mobile
+        state.camera.position.set(0, 4, 20); // Further back for mobile
       } else {
         state.camera.position.set(0, 5, 15); // Desktop position
       }
@@ -173,13 +173,22 @@ const DepthMatchingGameComponent = ({
       state.scene.add(directionalLight);
 
       // Add grid helper
-      const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
-      gridHelper.position.y = -3;
+      const gridSize = isMobile ? 16 : 20;
+      const gridHelper = new THREE.GridHelper(
+        gridSize,
+        gridSize,
+        0x444444,
+        0x222222
+      );
+      gridHelper.position.y = isMobile ? -2.5 : -3;
       state.scene.add(gridHelper);
 
       // Create reference planes
-      const planeGeometry = new THREE.PlaneGeometry(1, 10);
-      const positions = [-8, -4, 0, 4, 8];
+      const planeGeometry = new THREE.PlaneGeometry(
+        isMobile ? 0.8 : 1,
+        isMobile ? 8 : 10
+      );
+      const positions = isMobile ? [-6, -3, 0, 3, 6] : [-8, -4, 0, 4, 8];
       positions.forEach((z) => {
         const material = new THREE.MeshBasicMaterial({
           color: 0x00ff00,
@@ -357,21 +366,23 @@ const DepthMatchingGameComponent = ({
       const colors = [0x00ff00, 0x00aaff, 0xff00ff]; // Green, Blue, Magenta
 
       // SAFE POSITIONING: Reference objects on LEFT, Player objects on RIGHT
-      const referenceX = -8; // Left side
-      const playerX = 8; // Right side
+      const horizontalOffset = isMobile ? 4.5 : 8;
+      const referenceX = -horizontalOffset; // Left side
+      const playerX = horizontalOffset; // Right side
 
       // Vertical positions for stacking (when multiple objects)
+      const verticalOffset = isMobile ? 2.2 : 3;
       const yPositions: { [key: number]: number[] } = {
         1: [0], // Single object: centered
-        2: [-2, 2], // Two objects: stacked vertically
-        3: [-3, 0, 3], // Three objects: stacked vertically
+        2: [-verticalOffset / 2, verticalOffset / 2], // Two objects
+        3: [-verticalOffset, 0, verticalOffset], // Three objects
       };
 
       const yPos = yPositions[count] || [0];
 
       // Adaptive scaling based on mobile and object count
-      const baseScale = isMobile ? 0.7 : 1.0;
-      const objectScale = count > 2 ? baseScale * 0.8 : baseScale;
+      const baseScale = isMobile ? 0.6 : 1.0;
+      const objectScale = count > 2 ? baseScale * 0.9 : baseScale;
 
       for (let i = 0; i < count; i++) {
         // Create target object (colored sphere) - LEFT SIDE
@@ -747,7 +758,6 @@ const DepthMatchingGameComponent = ({
       }
       if (state.scene && window.THREE) {
         // Dispose scene resources
-        const THREE = window.THREE;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         state.scene.traverse((object: any) => {
           if ("geometry" in object && object.geometry) {
@@ -913,7 +923,7 @@ const DepthMatchingGameComponent = ({
       />
       <div
         ref={gameRef}
-        className="w-full h-screen flex flex-col bg-[#1a1a2e] overflow-hidden"
+        className="w-full min-h-screen flex flex-col bg-[#1a1a2e] overflow-x-hidden"
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-2 sm:p-4 flex-shrink-0">
@@ -966,7 +976,8 @@ const DepthMatchingGameComponent = ({
           id="game-canvas"
           className="flex-1 relative min-h-0 w-full"
           style={{
-            height: "100%",
+            height: isMobile ? "55vh" : "100%",
+            minHeight: isMobile ? "320px" : "480px",
             position: "relative",
             overflow: "hidden",
             backgroundColor: "#1a1a2e",

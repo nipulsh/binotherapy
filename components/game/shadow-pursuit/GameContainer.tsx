@@ -103,10 +103,21 @@ export function ShadowPursuitGameContainer({
       }
     });
 
-    // Update config with parent element
+    // Calculate responsive dimensions
+    const isMobileDevice = window.innerWidth < 768 || "ontouchstart" in window;
+    const gameWidth = isMobileDevice ? Math.min(window.innerWidth - 16, 800) : 800;
+    const gameHeight = isMobileDevice ? Math.floor(window.innerHeight * 0.75) : 600;
+
+    // Update config with parent element and responsive dimensions
     const config = {
       ...shadowPursuitConfig,
       parent: gameRef.current,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: gameWidth,
+        height: gameHeight,
+      },
       callbacks: {
         postBoot: () => {
           console.log("Phaser game booted");
@@ -232,38 +243,38 @@ export function ShadowPursuitGameContainer({
     <div className="relative w-full flex flex-col items-center">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-          <div className="text-white text-lg">Loading game...</div>
+          <div className="text-white text-sm sm:text-base md:text-lg">Loading game...</div>
         </div>
       )}
       {gameReady && !gameStarted && (
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center z-20 p-8"
+          className="absolute inset-0 flex flex-col items-center justify-center z-20 p-4 sm:p-6 md:p-8"
           style={{
             backgroundColor: "rgba(10, 10, 26, 0.95)",
             backdropFilter: "blur(10px)",
           }}
         >
           <h2
-            className="text-4xl md:text-5xl font-bold mb-6 tracking-tight"
+            className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 tracking-tight"
             style={{ color: "var(--galaxy-primary)" }}
           >
             Shadow Pursuit
           </h2>
-          <div className="text-white text-center space-y-3 mb-8 max-w-md">
-            <p className="text-lg">You are the Runner.</p>
-            <p className="text-lg">
+          <div className="text-white text-center space-y-2 sm:space-y-3 mb-6 sm:mb-8 max-w-md px-4">
+            <p className="text-sm sm:text-base md:text-lg">You are the Runner.</p>
+            <p className="text-sm sm:text-base md:text-lg">
               A dark shadow awakens and will follow you.
             </p>
-            <p className="text-lg">Survive as long as you can.</p>
-            <p className="text-sm text-gray-300 mt-4">
+            <p className="text-sm sm:text-base md:text-lg">Survive as long as you can.</p>
+            <p className="text-xs sm:text-sm text-gray-300 mt-3 sm:mt-4">
               {isMobile
-                ? "Use the joystick to move"
+                ? "Use the joystick below the game to move"
                 : "Use WASD or Arrow Keys to move"}
             </p>
           </div>
           <button
             onClick={startGame}
-            className="px-8 py-4 text-white rounded-lg text-xl font-semibold transition-all hover:scale-105"
+            className="px-6 sm:px-8 py-3 sm:py-4 text-white rounded-lg text-base sm:text-lg md:text-xl font-semibold transition-all hover:scale-105 touch-manipulation"
             style={{
               background:
                 "linear-gradient(to right, var(--galaxy-primary), var(--galaxy-secondary))",
@@ -274,11 +285,18 @@ export function ShadowPursuitGameContainer({
           </button>
         </div>
       )}
-      <div ref={gameRef} className="w-full" style={{ maxWidth: "800px" }} />
+      <div 
+        ref={gameRef} 
+        className="w-full" 
+        style={{ 
+          maxWidth: isMobile ? "100%" : "800px",
+          minHeight: isMobile ? "75vh" : "auto",
+        }} 
+      />
       {gameReady && gameStarted && (
         <button
           onClick={restartGame}
-          className="absolute top-4 right-4 z-20 px-4 py-2 rounded-lg transition-all hover:scale-105"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm rounded-lg transition-all hover:scale-105 touch-manipulation"
           style={{
             backgroundColor: "var(--galaxy-primary)",
             color: "white",
@@ -289,11 +307,13 @@ export function ShadowPursuitGameContainer({
         </button>
       )}
       {isMobile && gameReady && gameStarted && (
-        <VirtualJoystick
-          onMove={handleJoystickMove}
-          onStop={handleJoystickStop}
-          disabled={!gameStarted}
-        />
+        <div className="w-full flex justify-center mt-4 mb-4">
+          <VirtualJoystick
+            onMove={handleJoystickMove}
+            onStop={handleJoystickStop}
+            disabled={!gameStarted}
+          />
+        </div>
       )}
     </div>
   );

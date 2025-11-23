@@ -148,7 +148,7 @@ export function VirtualJoystick({
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-6 left-6 z-50 touch-none select-none"
+      className="relative z-50 touch-none select-none"
       style={{
         width: baseRadius * 2,
         height: baseRadius * 2,

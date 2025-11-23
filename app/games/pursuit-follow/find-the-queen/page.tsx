@@ -29,6 +29,11 @@ const FindTheQueenGameComponent = ({
     return 0;
   });
   const [startButtonDisabled, setStartButtonDisabled] = useState(false);
+  const [cardDimensions, setCardDimensions] = useState({
+    width: 120,
+    height: 180,
+    gap: 20,
+  });
 
   const gameStateRef = useRef<{
     queenPosition: number;
@@ -342,6 +347,60 @@ const FindTheQueenGameComponent = ({
     setMessageColor("white");
   }, []);
 
+  // Calculate responsive card dimensions
+  useEffect(() => {
+    const updateCardDimensions = () => {
+      if (typeof window === "undefined") return;
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Calculate available space (accounting for UI elements)
+      const availableWidth = vw - 32; // padding
+      const availableHeight = vh - 280; // UI elements height
+
+      // Calculate card dimensions based on viewport
+      let cardWidth: number;
+      let cardHeight: number;
+      let gap: number;
+
+      if (vw < 640) {
+        // Mobile: 3 cards with minimal gap
+        gap = Math.min(12, vw * 0.02);
+        cardWidth = Math.min(
+          90,
+          Math.floor((availableWidth - gap * 2) / 3)
+        );
+        cardHeight = cardWidth * 1.5;
+      } else if (vw < 768) {
+        // Small tablet
+        gap = 16;
+        cardWidth = Math.min(
+          100,
+          Math.floor((availableWidth - gap * 2) / 3)
+        );
+        cardHeight = cardWidth * 1.5;
+      } else {
+        // Desktop: default size
+        gap = 20;
+        cardWidth = 120;
+        cardHeight = 180;
+      }
+
+      // Ensure cards don't exceed available height
+      if (cardHeight > availableHeight) {
+        cardHeight = availableHeight;
+        cardWidth = Math.floor(cardHeight / 1.5);
+      }
+
+      setCardDimensions({ width: cardWidth, height: cardHeight, gap });
+    };
+
+    updateCardDimensions();
+    window.addEventListener("resize", updateCardDimensions);
+    return () => window.removeEventListener("resize", updateCardDimensions);
+  }, []);
+
   // Initialize game when started
   useEffect(() => {
     if (gameStarted && gameRef.current && window.gsap) {
@@ -381,23 +440,23 @@ const FindTheQueenGameComponent = ({
         onLoad={() => setGsapLoaded(true)}
       />
       <div
-        className="flex flex-col items-center justify-center w-full h-[calc(100vh-4rem)] p-4"
+        className="flex flex-col items-center justify-center w-full min-h-screen p-4 sm:p-6 md:p-8 overflow-auto"
         style={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         }}
       >
         {gsapLoaded && (
           <>
-            <div className="flex flex-col items-center space-y-4 mb-4">
-              <div className="flex gap-2.5">
+            <div className="flex flex-col items-center space-y-3 sm:space-y-4 mb-4 sm:mb-6 w-full max-w-2xl">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-2.5 w-full sm:w-auto">
                 {["easy", "medium", "hard"].map((d) => (
                   <button
                     key={d}
                     onClick={() => selectDifficulty(d)}
-                    className={`px-5 py-2.5 text-base font-bold cursor-pointer transition-all rounded-[20px] border-2 ${
+                    className={`px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base font-bold cursor-pointer transition-all rounded-[20px] border-2 touch-manipulation min-h-[44px] ${
                       difficulty === d
                         ? "bg-gradient-to-r from-[#f39c12] to-[#e67e22] border-[#f39c12] text-white"
-                        : "bg-white/20 text-white border-white hover:bg-white/30 hover:-translate-y-0.5"
+                        : "bg-white/20 text-white border-white hover:bg-white/30 hover:-translate-y-0.5 active:translate-y-0"
                     }`}
                   >
                     {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -410,13 +469,13 @@ const FindTheQueenGameComponent = ({
                   setGameStarted(true);
                 }}
                 disabled={startButtonDisabled}
-                className="mt-7 px-7.5 py-3 text-lg font-bold cursor-pointer bg-gradient-to-r from-[#f39c12] to-[#e67e22] text-white rounded-[25px] shadow-[0_4px_6px_rgba(0,0,0,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_8px_rgba(0,0,0,0.4)] active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="mt-3 sm:mt-7 px-6 sm:px-7.5 py-2.5 sm:py-3 text-base sm:text-lg font-bold cursor-pointer bg-gradient-to-r from-[#f39c12] to-[#e67e22] text-white rounded-[25px] shadow-[0_4px_6px_rgba(0,0,0,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_8px_rgba(0,0,0,0.4)] active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation min-h-[44px]"
               >
                 Start Game
               </button>
 
               <p
-                className="mt-5 text-xl font-bold min-h-[30px]"
+                className="mt-3 sm:mt-5 text-base sm:text-xl font-bold min-h-[24px] sm:min-h-[30px] text-center px-4"
                 style={{
                   color: messageColor,
                   textShadow: "2px 2px 4px rgba(0, 0, 0, 0.3)",
@@ -425,20 +484,29 @@ const FindTheQueenGameComponent = ({
                 {message}
               </p>
 
-              <div className="mt-4 text-lg text-white flex gap-12 bg-black/20 px-5 py-2.5 rounded-[15px]">
-                <p style={{ textShadow: "1px 1px 2px rgba(0, 0, 0, 0.2)" }}>
-                  Score: <span>{score}</span>
+              <div className="mt-3 sm:mt-4 text-sm sm:text-lg text-white flex flex-col sm:flex-row gap-3 sm:gap-12 bg-black/20 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[15px]">
+                <p
+                  className="text-center"
+                  style={{ textShadow: "1px 1px 2px rgba(0, 0, 0, 0.2)" }}
+                >
+                  Score: <span className="font-bold">{score}</span>
                 </p>
-                <p style={{ textShadow: "1px 1px 2px rgba(0, 0, 0, 0.2)" }}>
-                  High Score: <span>{highScore}</span>
+                <p
+                  className="text-center"
+                  style={{ textShadow: "1px 1px 2px rgba(0, 0, 0, 0.2)" }}
+                >
+                  High Score: <span className="font-bold">{highScore}</span>
                 </p>
               </div>
             </div>
 
             <div
               ref={gameRef}
-              className="flex gap-5 mt-5"
-              style={{ position: "relative" }}
+              className="flex justify-center items-center mt-4 sm:mt-5 w-full"
+              style={{
+                position: "relative",
+                gap: `${cardDimensions.gap}px`,
+              }}
             >
               {[0, 1, 2].map((index) => (
                 <div
@@ -447,10 +515,10 @@ const FindTheQueenGameComponent = ({
                   style={{ perspective: "1000px" }}
                 >
                   <div
-                    className="card cursor-pointer"
+                    className="card cursor-pointer touch-manipulation"
                     style={{
-                      width: "120px",
-                      height: "180px",
+                      width: `${cardDimensions.width}px`,
+                      height: `${cardDimensions.height}px`,
                       position: "relative",
                       transformStyle: "preserve-3d",
                     }}
@@ -474,12 +542,12 @@ const FindTheQueenGameComponent = ({
                           backfaceVisibility: "hidden",
                           background:
                             "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
-                          borderRadius: "10px",
-                          border: "3px solid #fff",
+                          borderRadius: `${Math.max(8, cardDimensions.width / 12)}px`,
+                          border: `${Math.max(2, cardDimensions.width / 40)}px solid #fff`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: "48px",
+                          fontSize: `${Math.max(32, cardDimensions.width * 0.4)}px`,
                           fontWeight: "bold",
                           color: "white",
                           boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
@@ -496,13 +564,13 @@ const FindTheQueenGameComponent = ({
                           backfaceVisibility: "hidden",
                           background:
                             "linear-gradient(135deg, #3498db 0%, #2980b9 100%)",
-                          borderRadius: "10px",
-                          border: "3px solid #fff",
+                          borderRadius: `${Math.max(8, cardDimensions.width / 12)}px`,
+                          border: `${Math.max(2, cardDimensions.width / 40)}px solid #fff`,
                           transform: "rotateY(180deg)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: "64px",
+                          fontSize: `${Math.max(40, cardDimensions.width * 0.53)}px`,
                           boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
                         }}
                       />
@@ -515,16 +583,21 @@ const FindTheQueenGameComponent = ({
         )}
       </div>
       <style jsx>{`
-        .card:hover {
-          transform: scale(1.05);
+        @media (hover: hover) {
+          .card:hover {
+            transform: scale(1.05);
+          }
         }
         .card-back.queen::after {
           content: "👑";
-          font-size: 64px;
+          font-size: ${Math.max(40, cardDimensions.width * 0.53)}px;
         }
         .card-back.not-queen::after {
           content: "❌";
-          font-size: 48px;
+          font-size: ${Math.max(32, cardDimensions.width * 0.4)}px;
+        }
+        .card {
+          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
     </>

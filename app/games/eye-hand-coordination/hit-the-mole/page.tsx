@@ -22,12 +22,14 @@ const HitTheMoleGameComponent = ({
   const gameStateRef = useRef<{
     isPlaying: boolean;
     activeMoles: Set<number>;
+    moleTimeouts: Map<number, NodeJS.Timeout>;
     spawnInterval: NodeJS.Timeout | null;
     timerInterval: NodeJS.Timeout | null;
     difficulty: string;
   }>({
     isPlaying: false,
     activeMoles: new Set(),
+    moleTimeouts: new Map(),
     spawnInterval: null,
     timerInterval: null,
     difficulty: "easy",
@@ -68,10 +70,21 @@ const HitTheMoleGameComponent = ({
     const mole = hole.querySelector(".mole") as HTMLElement;
     if (!mole) return;
 
+    // Clear any pending timeout for this mole
+    const timeout = gameStateRef.current.moleTimeouts.get(holeIndex);
+    if (timeout) {
+      clearTimeout(timeout);
+      gameStateRef.current.moleTimeouts.delete(holeIndex);
+    }
+
+    // Only hide if mole is actually active
+    if (!gameStateRef.current.activeMoles.has(holeIndex)) return;
+
     gameStateRef.current.activeMoles.delete(holeIndex);
 
     // Animate mole going down
     if (window.gsap) {
+      window.gsap.killTweensOf(mole); // Kill any existing animations
       window.gsap.to(mole, {
         y: 100,
         opacity: 0,
@@ -80,6 +93,9 @@ const HitTheMoleGameComponent = ({
         ease: "power2.in",
         onComplete: () => {
           mole.classList.remove("active");
+          if (window.gsap) {
+            window.gsap.set(mole, { y: 100, opacity: 0, scale: 0.5 });
+          }
         },
       });
     } else {
@@ -100,8 +116,12 @@ const HitTheMoleGameComponent = ({
       const mole = hole.querySelector(".mole") as HTMLElement;
       if (!mole) return;
 
-      // Don't spawn if already active
-      if (gameStateRef.current.activeMoles.has(holeIndex)) return;
+      // Don't spawn if already active or has pending timeout
+      if (
+        gameStateRef.current.activeMoles.has(holeIndex) ||
+        gameStateRef.current.moleTimeouts.has(holeIndex)
+      )
+        return;
 
       gameStateRef.current.activeMoles.add(holeIndex);
       mole.classList.add("active");
@@ -113,6 +133,7 @@ const HitTheMoleGameComponent = ({
 
       // Animate mole popping up
       if (window.gsap) {
+        window.gsap.killTweensOf(mole); // Kill any existing animations
         window.gsap.set(mole, { y: 100, opacity: 0, scale: 0.5 });
         window.gsap.to(mole, {
           y: 0,
@@ -124,11 +145,16 @@ const HitTheMoleGameComponent = ({
       }
 
       // Auto-hide mole after visible time
-      setTimeout(() => {
-        if (mole.classList.contains("active")) {
+      const timeout = setTimeout(() => {
+        if (
+          gameStateRef.current.activeMoles.has(holeIndex) &&
+          mole.classList.contains("active")
+        ) {
           hideMole(holeIndex);
         }
       }, settings.visibleTime);
+
+      gameStateRef.current.moleTimeouts.set(holeIndex, timeout);
     },
     [hideMole, difficultySettings]
   );
@@ -202,6 +228,12 @@ const HitTheMoleGameComponent = ({
       clearInterval(gameStateRef.current.timerInterval);
       gameStateRef.current.timerInterval = null;
     }
+
+    // Clear all mole timeouts
+    gameStateRef.current.moleTimeouts.forEach((timeout) => {
+      clearTimeout(timeout);
+    });
+    gameStateRef.current.moleTimeouts.clear();
 
     // Hide all active moles
     gameStateRef.current.activeMoles.forEach((holeIndex) => {
@@ -329,6 +361,11 @@ const HitTheMoleGameComponent = ({
       if (state.timerInterval) {
         clearInterval(state.timerInterval);
       }
+      // Clear all mole timeouts
+      state.moleTimeouts.forEach((timeout) => {
+        clearTimeout(timeout);
+      });
+      state.moleTimeouts.clear();
     };
   }, []);
 
@@ -338,17 +375,19 @@ const HitTheMoleGameComponent = ({
         src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"
         onLoad={() => setGsapLoaded(true)}
       />
-      <div className="flex flex-col items-center justify-center w-full h-[calc(100vh-4rem)] p-4 bg-gradient-to-br from-green-600 to-green-800">
+      <div className="flex flex-col items-center justify-center w-full min-h-screen p-4 sm:p-6 md:p-8 bg-gradient-to-br from-green-600 to-green-800 overflow-auto">
         {!gameStarted && gsapLoaded && (
-          <div className="flex flex-col items-center space-y-4 mb-8">
-            <h3 className="text-xl font-bold text-white">Select Difficulty</h3>
-            <div className="flex space-x-4">
+          <div className="flex flex-col items-center space-y-4 mb-6 sm:mb-8">
+            <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+              Select Difficulty
+            </h3>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               {["easy", "medium", "hard"].map((d) => (
                 <Button
                   key={d}
                   onClick={() => startGameInternal(d)}
                   variant={difficulty === d ? "default" : "outline"}
-                  className="bg-white/20 hover:bg-white/30 text-white border-white"
+                  className="bg-white/20 hover:bg-white/30 text-white border-white min-h-[44px] px-6"
                 >
                   {d.charAt(0).toUpperCase() + d.slice(1)}
                 </Button>
@@ -358,15 +397,17 @@ const HitTheMoleGameComponent = ({
         )}
 
         {gameStarted && (
-          <div className="flex flex-col items-center space-y-4 mb-6">
-            <div className="flex space-x-8 text-white">
+          <div className="flex flex-col items-center space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+            <div className="flex space-x-6 sm:space-x-8 text-white">
               <div className="text-center">
-                <div className="text-sm opacity-80">Score</div>
-                <div className="text-3xl font-bold">{score}</div>
+                <div className="text-xs sm:text-sm opacity-80">Score</div>
+                <div className="text-2xl sm:text-3xl font-bold">{score}</div>
               </div>
               <div className="text-center">
-                <div className="text-sm opacity-80">Time</div>
-                <div className="text-3xl font-bold">{timeRemaining}s</div>
+                <div className="text-xs sm:text-sm opacity-80">Time</div>
+                <div className="text-2xl sm:text-3xl font-bold">
+                  {timeRemaining}s
+                </div>
               </div>
             </div>
           </div>
@@ -374,15 +415,14 @@ const HitTheMoleGameComponent = ({
 
         <div
           ref={gameRef}
-          className="grid grid-cols-3 gap-6 p-6 bg-green-900/30 rounded-2xl backdrop-blur-sm"
-          style={{ minHeight: "400px" }}
+          className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 p-3 sm:p-4 md:p-6 bg-green-900/30 rounded-2xl backdrop-blur-sm max-w-full"
         >
           {Array.from({ length: TOTAL_HOLES }).map((_, index) => (
             <div
               key={index}
               data-hole-index={index}
               onClick={(e) => hitMole(index, e)}
-              className="relative w-32 h-32 cursor-pointer flex items-end justify-center"
+              className="relative w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 cursor-pointer flex items-end justify-center touch-manipulation"
             >
               {/* Hole */}
               <div
@@ -395,7 +435,7 @@ const HitTheMoleGameComponent = ({
               />
               {/* Mole */}
               <div
-                className="mole relative z-10 w-20 h-20 rounded-full flex items-center justify-center text-5xl transition-all duration-300"
+                className="mole relative z-10 w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 rounded-full flex items-center justify-center text-3xl xs:text-4xl sm:text-4xl md:text-5xl transition-all duration-300"
                 style={{
                   background:
                     "radial-gradient(circle, #8b6f47 0%, #6b5438 50%, #4a3726 100%)",
@@ -412,8 +452,8 @@ const HitTheMoleGameComponent = ({
         </div>
 
         {gameStarted && (
-          <div className="mt-6 text-white text-center">
-            <p className="text-sm opacity-80">
+          <div className="mt-4 sm:mt-6 text-white text-center px-4">
+            <p className="text-xs sm:text-sm opacity-80">
               Click on the moles as they pop up!
             </p>
           </div>

@@ -29,8 +29,8 @@ export class ShadowPursuitScene extends Phaser.Scene {
   private arenaBounds!: Phaser.GameObjects.Rectangle;
   private arenaWidth: number = 800;
   private arenaHeight: number = 600;
-  private playerRadius: number = 10;
-  private chaserRadius: number = 10;
+  private playerRadius: number = 20; // Reduced hitbox
+  private chaserRadius: number = 20; // Reduced hitbox
   private cameraShake: boolean = false;
   private dangerZone: number = 100;
   private joystickDirection: { x: number; y: number } = { x: 0, y: 0 };
@@ -38,9 +38,7 @@ export class ShadowPursuitScene extends Phaser.Scene {
   private lastUIUpdateTime: number = 0;
   private isRestarting: boolean = false;
   private audioUnlocked: boolean = false;
-
-  // Obstacles
-  private obstacles!: Phaser.Physics.Arcade.StaticGroup;
+  private readonly WORLD_MARGIN: number = 50; // Consistent margin for world bounds and clamping
 
   constructor() {
     super({ key: "ShadowPursuitScene" });
@@ -92,21 +90,21 @@ export class ShadowPursuitScene extends Phaser.Scene {
     );
     this.arenaBounds.setStrokeStyle(2, 0x4a90e2, 0.5);
 
-    // Create obstacles (colorful rectangles)
-    this.obstacles = this.physics.add.staticGroup();
-    this.createObstacles();
-
-    // Create player (Thief)
-    this.player = this.add.image(100, 100, "thief");
-    this.player.setScale(0.2);
+    // Create player (Thief) - Reduced size
+    // Ensure spawn position is within bounds on all screen sizes
+    const playerStartX = Math.max(this.WORLD_MARGIN + 50, Math.min(100, width - this.WORLD_MARGIN - 50));
+    const playerStartY = Math.max(this.WORLD_MARGIN + 50, Math.min(100, height - this.WORLD_MARGIN - 50));
+    this.player = this.add.image(playerStartX, playerStartY, "thief");
+    this.player.setScale(0.1); // Reduced from 0.2 to 0.1
     this.player.setOrigin(0.5, 0.5);
     this.player.setTint(0x00d4ff);
 
-    // Create chaser (Police)
-    const chaserStartX = width - 150;
-    const chaserStartY = height - 150;
+    // Create chaser (Police) - Reduced size
+    // Ensure spawn position is within bounds on all screen sizes
+    const chaserStartX = Math.max(this.WORLD_MARGIN + 50, Math.min(width - 150, width - this.WORLD_MARGIN - 50));
+    const chaserStartY = Math.max(this.WORLD_MARGIN + 50, Math.min(height - 150, height - this.WORLD_MARGIN - 50));
     this.chaser = this.add.image(chaserStartX, chaserStartY, "police");
-    this.chaser.setScale(0.2);
+    this.chaser.setScale(0.1); // Reduced from 0.2 to 0.1
     this.chaser.setOrigin(0.5, 0.5);
     this.chaser.setTint(0xff4444);
 
@@ -217,39 +215,32 @@ export class ShadowPursuitScene extends Phaser.Scene {
     this.physics.add.existing(this.player, false);
     this.physics.add.existing(this.chaser, false);
 
-    // Set world bounds
-    const margin = 50;
+    // Set circular hitboxes to match smaller sprite size
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    const chaserBody = this.chaser.body as Phaser.Physics.Arcade.Body;
+    
+    playerBody.setCircle(this.playerRadius); // Smaller circular hitbox
+    chaserBody.setCircle(this.chaserRadius); // Smaller circular hitbox
+
+    // Set world bounds to match actual canvas size (important for mobile scaling)
+    const boundsWidth = width - this.WORLD_MARGIN * 2;
+    const boundsHeight = height - this.WORLD_MARGIN * 2;
+    
     this.physics.world.setBounds(
-      margin,
-      margin,
-      this.arenaWidth - margin * 2,
-      this.arenaHeight - margin * 2
+      this.WORLD_MARGIN,
+      this.WORLD_MARGIN,
+      boundsWidth,
+      boundsHeight
     );
 
-    (this.player.body as Phaser.Physics.Arcade.Body).setCollideWorldBounds(
-      true
-    );
-    (this.chaser.body as Phaser.Physics.Arcade.Body).setCollideWorldBounds(
-      true
-    );
+    playerBody.setCollideWorldBounds(true);
+    chaserBody.setCollideWorldBounds(true);
 
-    // Collision detection - player vs chaser
+    // Collision detection - player vs chaser only (obstacles removed)
     this.physics.add.overlap(
       this.player,
       this.chaser,
       this.onCaught,
-      undefined,
-      this
-    );
-
-    // Collision detection - player vs obstacles
-    this.physics.add.collider(this.player, this.obstacles);
-
-    // Collision detection - police vs obstacles (with custom slide callback)
-    this.physics.add.collider(
-      this.chaser,
-      this.obstacles,
-      this.handlePoliceObstacleCollision,
       undefined,
       this
     );
@@ -263,8 +254,6 @@ export class ShadowPursuitScene extends Phaser.Scene {
     this.lastLevelUpTime = 0;
 
     // Ensure both are stationary before game starts
-    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
-    const chaserBody = this.chaser.body as Phaser.Physics.Arcade.Body;
     playerBody.setVelocity(0, 0);
     chaserBody.setVelocity(0, 0);
 
@@ -279,36 +268,6 @@ export class ShadowPursuitScene extends Phaser.Scene {
     });
   }
 
-  createObstacles() {
-    const { width, height } = this.scale;
-
-    // Create exactly 2 obstacles at fixed positions
-    // Obstacle 1 - Left side
-    const obstacle1 = this.add.rectangle(
-      width * 0.25, // 25% from left
-      height / 2, // Center vertically
-      80, // Width
-      120, // Height
-      0x9d5cff, // Purple color
-      0.8
-    );
-    obstacle1.setStrokeStyle(3, 0x9d5cff, 1);
-    this.obstacles.add(obstacle1);
-    (obstacle1.body as Phaser.Physics.Arcade.StaticBody).setSize(80, 120);
-
-    // Obstacle 2 - Right side
-    const obstacle2 = this.add.rectangle(
-      width * 0.75, // 75% from left
-      height / 2, // Center vertically
-      80, // Width
-      120, // Height
-      0x00d4ff, // Cyan color
-      0.8
-    );
-    obstacle2.setStrokeStyle(3, 0x00d4ff, 1);
-    this.obstacles.add(obstacle2);
-    (obstacle2.body as Phaser.Physics.Arcade.StaticBody).setSize(80, 120);
-  }
 
   update() {
     if (!this.gameStarted || this.gameState !== "PLAYING") return;
@@ -374,9 +333,21 @@ export class ShadowPursuitScene extends Phaser.Scene {
       }
 
       playerBody.setVelocity(velocityX, velocityY);
+      
+      // Additional boundary clamping for mobile (ensures no overflow)
+      if (this.isMobile) {
+        const { width, height } = this.scale;
+        const minX = this.WORLD_MARGIN + this.playerRadius;
+        const maxX = width - this.WORLD_MARGIN - this.playerRadius;
+        const minY = this.WORLD_MARGIN + this.playerRadius;
+        const maxY = height - this.WORLD_MARGIN - this.playerRadius;
+        
+        this.player.x = Phaser.Math.Clamp(this.player.x, minX, maxX);
+        this.player.y = Phaser.Math.Clamp(this.player.y, minY, maxY);
+      }
     }
 
-    // Chaser AI - moves toward player with obstacle avoidance
+    // Chaser AI - moves directly toward player (no obstacles)
     if (this.gameStarted) {
       const chaserBody = this.chaser.body as Phaser.Physics.Arcade.Body;
       const dx = this.player.x - this.chaser.x;
@@ -387,39 +358,23 @@ export class ShadowPursuitScene extends Phaser.Scene {
         const normalizedX = dx / distance;
         const normalizedY = dy / distance;
 
-        // Calculate desired velocity
+        // Direct movement toward player
         const desiredVelX = normalizedX * this.chaserSpeed;
         const desiredVelY = normalizedY * this.chaserSpeed;
 
-        // Check if police is touching an obstacle
-        const isTouching =
-          chaserBody.touching.left ||
-          chaserBody.touching.right ||
-          chaserBody.touching.up ||
-          chaserBody.touching.down;
-
-        if (isTouching) {
-          // Apply sliding logic - reduce velocity on blocked axis
-          let finalVelX = desiredVelX;
-          let finalVelY = desiredVelY;
-
-          // If blocked horizontally, slide vertically
-          if (chaserBody.touching.left || chaserBody.touching.right) {
-            finalVelX = 0;
-            finalVelY = desiredVelY * 1.2; // Boost slide velocity slightly
-          }
-
-          // If blocked vertically, slide horizontally
-          if (chaserBody.touching.up || chaserBody.touching.down) {
-            finalVelY = 0;
-            finalVelX = desiredVelX * 1.2; // Boost slide velocity slightly
-          }
-
-          chaserBody.setVelocity(finalVelX, finalVelY);
-        } else {
-          // Normal movement when not touching obstacles
-          chaserBody.setVelocity(desiredVelX, desiredVelY);
-        }
+        chaserBody.setVelocity(desiredVelX, desiredVelY);
+      }
+      
+      // Additional boundary clamping for mobile (ensures no overflow)
+      if (this.isMobile) {
+        const { width, height } = this.scale;
+        const minX = this.WORLD_MARGIN + this.chaserRadius;
+        const maxX = width - this.WORLD_MARGIN - this.chaserRadius;
+        const minY = this.WORLD_MARGIN + this.chaserRadius;
+        const maxY = height - this.WORLD_MARGIN - this.chaserRadius;
+        
+        this.chaser.x = Phaser.Math.Clamp(this.chaser.x, minX, maxX);
+        this.chaser.y = Phaser.Math.Clamp(this.chaser.y, minY, maxY);
       }
     }
 
@@ -469,45 +424,6 @@ export class ShadowPursuitScene extends Phaser.Scene {
   setJoystickDirection(direction: { x: number; y: number }) {
     this.joystickDirection = direction;
   }
-
-  // Handle police collision with obstacles - enable sliding
-  handlePoliceObstacleCollision = (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    police: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _obstacle?: any
-  ) => {
-    // This callback is called when collision occurs
-    // The actual sliding logic is in the update loop where we check body.touching
-    // We just ensure the body doesn't get stuck by allowing slight overlap
-    const policeBody = (police as Phaser.GameObjects.Image)
-      .body as Phaser.Physics.Arcade.Body;
-
-    // Ensure the police body doesn't lose all momentum
-    // This prevents hard stops
-    if (
-      Math.abs(policeBody.velocity.x) < 10 &&
-      Math.abs(policeBody.velocity.y) < 10
-    ) {
-      // If velocity is too low, give a small push to prevent complete stop
-      const dx = this.player.x - this.chaser.x;
-      const dy = this.player.y - this.chaser.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > 0) {
-        const normalizedX = dx / distance;
-        const normalizedY = dy / distance;
-
-        // Apply minimum velocity to keep moving
-        if (Math.abs(policeBody.velocity.x) < 10) {
-          policeBody.setVelocityX(normalizedX * this.chaserSpeed * 0.3);
-        }
-        if (Math.abs(policeBody.velocity.y) < 10) {
-          policeBody.setVelocityY(normalizedY * this.chaserSpeed * 0.3);
-        }
-      }
-    }
-  };
 
   onCaught = () => {
     if (this.gameState === "GAME_OVER") return;
@@ -582,7 +498,7 @@ export class ShadowPursuitScene extends Phaser.Scene {
         survivalTime: this.survivalTime,
         level_reached: this.currentLevel,
         final_police_speed: this.chaserSpeed,
-        obstacles_enabled: true,
+        obstacles_enabled: false,
         gameName: "shadow-pursuit",
         game_type: "pursuit-follow",
       },
@@ -611,7 +527,7 @@ export class ShadowPursuitScene extends Phaser.Scene {
       if (this.chaser) {
         this.chaser.clearTint();
         this.chaser.setTint(0xff4444);
-        this.chaser.setScale(0.2);
+        this.chaser.setScale(0.1); // Reduced from 0.2 to 0.1
       }
     }
   }
