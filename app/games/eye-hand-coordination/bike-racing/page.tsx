@@ -144,18 +144,12 @@ const StreetBikeRacingGameComponent = ({
       color: 0x888888,
     });
 
-    const leftSidewalk = new THREE.Mesh(
-      sidewalkGeometry,
-      sidewalkMaterial
-    );
+    const leftSidewalk = new THREE.Mesh(sidewalkGeometry, sidewalkMaterial);
     leftSidewalk.rotation.x = -Math.PI / 2;
     leftSidewalk.position.set(-ROAD_WIDTH / 2 - 1, 0, -50);
     scene.add(leftSidewalk);
 
-    const rightSidewalk = new THREE.Mesh(
-      sidewalkGeometry,
-      sidewalkMaterial
-    );
+    const rightSidewalk = new THREE.Mesh(sidewalkGeometry, sidewalkMaterial);
     rightSidewalk.rotation.x = -Math.PI / 2;
     rightSidewalk.position.set(ROAD_WIDTH / 2 + 1, 0, -50);
     scene.add(rightSidewalk);
@@ -241,22 +235,11 @@ const StreetBikeRacingGameComponent = ({
       const width = Math.random() * 3 + 2;
       const depth = Math.random() * 4 + 3;
 
-      const buildingGeometry = new THREE.BoxGeometry(
-        width,
-        height,
-        depth
-      );
+      const buildingGeometry = new THREE.BoxGeometry(width, height, depth);
       const buildingMaterial = new THREE.MeshStandardMaterial({
-        color: new THREE.Color().setHSL(
-          Math.random() * 0.1 + 0.5,
-          0.5,
-          0.5
-        ),
+        color: new THREE.Color().setHSL(Math.random() * 0.1 + 0.5, 0.5, 0.5),
       });
-      const building = new THREE.Mesh(
-        buildingGeometry,
-        buildingMaterial
-      );
+      const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
 
       const side = Math.random() < 0.5 ? -1 : 1;
       building.position.set(
@@ -404,12 +387,12 @@ const StreetBikeRacingGameComponent = ({
           if (obj.geometry) {
             obj.geometry.dispose();
           }
-            if (obj.material) {
-              if (Array.isArray(obj.material)) {
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               obj.material.forEach((mat: any) => mat.dispose());
-              } else {
-                obj.material.dispose();
+            } else {
+              obj.material.dispose();
             }
           }
         });
@@ -458,7 +441,12 @@ const StreetBikeRacingGameComponent = ({
 
     // Draw bike (player)
     ctx.fillStyle = "#FF0000";
-    ctx.fillRect(bikeX - bikeWidth / 2, height - bikeHeight - 10, bikeWidth, bikeHeight);
+    ctx.fillRect(
+      bikeX - bikeWidth / 2,
+      height - bikeHeight - 10,
+      bikeWidth,
+      bikeHeight
+    );
 
     // Draw traffic
     ctx.fillStyle = "#00FF00";
@@ -468,7 +456,12 @@ const StreetBikeRacingGameComponent = ({
         const carRelativeX = (car.position.x + ROAD_WIDTH / 2) / ROAD_WIDTH;
         const carX = roadPadding + carRelativeX * roadWidth;
         const carY = height - (relativeZ + 60) * (height / 90) - 20;
-        ctx.fillRect(carX - bikeWidth / 2.5, carY, bikeWidth / 1.2, bikeHeight / 1.5);
+        ctx.fillRect(
+          carX - bikeWidth / 2.5,
+          carY,
+          bikeWidth / 1.2,
+          bikeHeight / 1.5
+        );
       }
     });
   }, []);
@@ -788,7 +781,7 @@ const StreetBikeRacingGameComponent = ({
       if ((window as any).handleGameEnd) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).handleGameEnd(result);
-      } else {
+      } else if (onGameEnd) {
         onGameEnd(result);
       }
     };
@@ -843,7 +836,9 @@ const StreetBikeRacingGameComponent = ({
         {/* HUD */}
         <div
           className={`hud absolute left-1/2 transform -translate-x-1/2 z-50 flex bg-black/70 rounded-2xl border-4 border-yellow-400 shadow-lg shadow-yellow-400/50 ${
-            isMobile ? "top-2 flex-col gap-3 px-4 py-3 w-[92%]" : "top-5 flex-row gap-10 px-10 py-5"
+            isMobile
+              ? "top-2 flex-col gap-3 px-4 py-3 w-[92%]"
+              : "top-5 flex-row gap-10 px-10 py-5"
           }`}
         >
           <div className="text-center">
@@ -852,7 +847,7 @@ const StreetBikeRacingGameComponent = ({
             </span>
             <span
               id="score"
-            className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
+              className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
             >
               0
             </span>
@@ -863,7 +858,7 @@ const StreetBikeRacingGameComponent = ({
             </span>
             <span
               id="speed"
-            className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
+              className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
             >
               60
             </span>
@@ -875,7 +870,7 @@ const StreetBikeRacingGameComponent = ({
             </span>
             <span
               id="distance"
-            className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
+              className="inline-block text-white text-2xl sm:text-3xl font-bold text-shadow min-w-[70px]"
             >
               0
             </span>
@@ -944,7 +939,6 @@ const StreetBikeRacingGameComponent = ({
             </div>
           </div>
         )}
-
       </div>
 
       <style jsx>{`
